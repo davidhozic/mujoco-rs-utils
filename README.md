@@ -1,2 +1,2 @@
-# mujoco-rs-proc-macros
-Procedual macros used in [mujoco-rs](https://github.com/davidhozic/mujoco-rs)
+# mujoco-rs-utils
+Utilities used in [mujoco-rs](https://github.com/davidhozic/mujoco-rs)
