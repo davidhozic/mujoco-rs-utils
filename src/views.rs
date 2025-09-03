@@ -35,13 +35,13 @@ pub fn create_views(filepath: &Path) {
                 item.trim()
             }).collect();
 
-            if let [_, prefix, suffix, ntotaldim, dim] = &parts[..] {
+            if let [_, _, suffix, ntotaldim, dim] = &parts[..] {
                 // Match the number of dimensions string to correct mapping address array in MjModel
                 if *dim != "1" {
-                    println!("      let {prefix}{suffix} = (id * {dim} * {ntotaldim}, {dim} * {ntotaldim});");
+                    println!("      let {suffix} = (id * {dim}, {dim});");
                 }
                 else {
-                    println!("      let {prefix}{suffix} = mj_view_indices!(id, mj_model_nx_to_mapping!(model_ffi, {ntotaldim}), mj_model_nx_to_nitem!(model_ffi, {ntotaldim}), model_ffi.{ntotaldim});");
+                    println!("      let {suffix} = mj_view_indices!(id, mj_model_nx_to_mapping!(model_ffi, {ntotaldim}), mj_model_nx_to_nitem!(model_ffi, {ntotaldim}), model_ffi.{ntotaldim});");
                 }
             }
         }
