@@ -26,3 +26,8 @@ Cargo.lock
 
 # Vscode
 settings.json
+
+
+# Added by cargo
+
+/target
