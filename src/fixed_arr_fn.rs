@@ -6,7 +6,7 @@ use std::fs;
 use regex;
 
 
-const RE_FUNCTION_DECL: &str = r"MJAPI\s+((?:const)?\s*(?:[A-z0-9_*]+))\s+(\w+)\s*\((.+)\)";
+const RE_FUNCTION_DECL: &str = r"(?s)MJAPI\s+((?:const)?\s*(?:[A-z0-9_*]+))\s+(\w+)\s*\((.+?)\)";
 
 
 fn capitalize(s: &str) -> String {
@@ -94,7 +94,7 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
         if return_type == "void" {
             return_type_out = String::new();
         }
-        else if return_type.starts_with("mjt") {
+        else if return_type.starts_with("mj") {
             return_type_out = format!(" -> {}", capitalize(return_type));
         }
         else {
@@ -103,7 +103,7 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
 
         println!("
         pub fn {fn_name}({parameters_joined}){return_type_out}  {{
-            unsafe {{ {fn_name}({}) }}
+            unsafe {{ mujoco_c::{fn_name}({}) }}
         }}
         ", out_parameters_names.join(", "));
     }
