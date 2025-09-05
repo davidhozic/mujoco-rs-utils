@@ -27,6 +27,10 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
     let mut parameter_end;
     let mut param_type;
     let mut parameter_arr_len;
+    let mut parameters_joined;
+    let mut return_type_out;
+    let mut out_parameters = Vec::new();
+    let mut out_parameters_names = Vec::new();
     'fn_loop: for capture in re.captures_iter(&filedata) {
         let (return_type, fn_name, param_string) = (
             capture.get(1).unwrap().as_str(),
@@ -38,7 +42,8 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
             continue;
         }
 
-        let mut out_parameters = Vec::new();
+        out_parameters.clear();
+        out_parameters_names.clear();
         for parameter in param_string.split(",") {
             parameter_parts = parameter.split_ascii_whitespace().collect();
 
@@ -53,15 +58,18 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
                 position_end = parameter_end.len() - 1;
                 parameter_arr_len = &parameter_end[position_start + 1 .. position_end];
 
-                /* Put the Rust signature together */
+                /* Parameter name */
+                parameter_end = &parameter_end[..position_start];
+
+                /* Obtain the reference operator and make the parameter call either .as_ptr() or .as_mut_ptr() */
                 (mutability, param_type) = if parameter_parts[0] == "const" {
+                    out_parameters_names.push(format!("{parameter_end}.as_ptr()"));
                     ("&", parameter_parts[1])  // index 1 has the type
                 }
                 else {
+                    out_parameters_names.push(format!("{parameter_end}.as_mut_ptr()"));
                     ("&mut ", parameter_parts[0])  // index 0 has the type
                 };
-
-                parameter_end = &parameter_end[..position_start];
 
                 if param_type.starts_with("mj") {
                     out_parameters.push(format!("{}: {mutability}[{}; {parameter_arr_len}]", parameter_end, capitalize(param_type)));
@@ -78,9 +86,25 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
                 else {
                     out_parameters.push(format!("{}: std::ffi::c_{}", parameter_parts[1], param_type));
                 }
+                out_parameters_names.push(parameter_parts[1].to_string());
             }
         }
 
-        println!("pub fn {fn_name}({}) -> std::ffi::c_{}", out_parameters.join(", "), return_type);
+        parameters_joined = out_parameters.join(", ");
+        if return_type == "void" {
+            return_type_out = String::new();
+        }
+        else if return_type.starts_with("mjt") {
+            return_type_out = format!(" -> {}", capitalize(return_type));
+        }
+        else {
+            return_type_out = format!(" -> std::ffi::c_{return_type}");
+        };
+
+        println!("
+        pub fn {fn_name}({parameters_joined}){return_type_out}  {{
+            unsafe {{ {fn_name}({}) }}
+        }}
+        ", out_parameters_names.join(", "));
     }
 }
