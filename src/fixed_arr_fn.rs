@@ -1,19 +1,13 @@
 //! Module for the CreateFixedArrayFunctionWrappers command.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::path::Path;
 use std::fs;
+use inflector::Inflector;
 use regex;
 
 
 const RE_FUNCTION_DECL: &str = r"(?s)MJAPI\s+((?:const)?\s*(?:[A-z0-9_*]+))\s+(\w+)\s*\((.+?)\)";
-
-
-fn capitalize(s: &str) -> String {
-    let mut chars = s.chars();
-    let first = chars.next().unwrap();
-    first.to_uppercase().chain(chars).collect()
-}
 
 
 pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
@@ -31,6 +25,7 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
     let mut return_type_out;
     let mut out_parameters = Vec::new();
     let mut out_parameters_names = Vec::new();
+    let mut parameter_name;
     'fn_loop: for capture in re.captures_iter(&filedata) {
         let (return_type, fn_name, param_string) = (
             capture.get(1).unwrap().as_str(),
@@ -59,34 +54,34 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
                 parameter_arr_len = &parameter_end[position_start + 1 .. position_end];
 
                 /* Parameter name */
-                parameter_end = &parameter_end[..position_start];
+                parameter_name = parameter_end[..position_start].to_snake_case();
 
                 /* Obtain the reference operator and make the parameter call either .as_ptr() or .as_mut_ptr() */
                 (mutability, param_type) = if parameter_parts[0] == "const" {
-                    out_parameters_names.push(format!("{parameter_end}.as_ptr()"));
+                    out_parameters_names.push(format!("{parameter_name}.as_ptr()"));
                     ("&", parameter_parts[1])  // index 1 has the type
                 }
                 else {
-                    out_parameters_names.push(format!("{parameter_end}.as_mut_ptr()"));
+                    out_parameters_names.push(format!("{parameter_name}.as_mut_ptr()"));
                     ("&mut ", parameter_parts[0])  // index 0 has the type
                 };
 
                 if param_type.starts_with("mj") {
-                    out_parameters.push(format!("{}: {mutability}[{}; {parameter_arr_len}]", parameter_end, capitalize(param_type)));
+                    out_parameters.push(format!("{}: {mutability}[{}; {parameter_arr_len}]", parameter_name, param_type.to_pascal_case()));
                 }
                 else {
-                    out_parameters.push(format!("{}: {mutability}[std::ffi::c_{}; {parameter_arr_len}]", parameter_end, param_type));
+                    out_parameters.push(format!("{}: {mutability}[std::ffi::c_{}; {parameter_arr_len}]", parameter_name, param_type));
                 }
             }
             else {
                 param_type = parameter_parts[0];
                 if param_type.starts_with("mj") {
-                    out_parameters.push(format!("{}: {}", parameter_parts[1], capitalize(param_type)));
+                    out_parameters.push(format!("{}: {}", parameter_parts[1].to_snake_case(), param_type.to_pascal_case()));
                 }
                 else {
-                    out_parameters.push(format!("{}: std::ffi::c_{}", parameter_parts[1], param_type));
+                    out_parameters.push(format!("{}: std::ffi::c_{}", parameter_parts[1].to_snake_case(), param_type));
                 }
-                out_parameters_names.push(parameter_parts[1].to_string());
+                out_parameters_names.push(parameter_parts[1].to_snake_case());
             }
         }
 
@@ -95,16 +90,16 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
             return_type_out = String::new();
         }
         else if return_type.starts_with("mj") {
-            return_type_out = format!(" -> {}", capitalize(return_type));
+            return_type_out = format!(" -> {}", return_type.to_pascal_case());
         }
         else {
             return_type_out = format!(" -> std::ffi::c_{return_type}");
         };
 
         println!("
-        pub fn {fn_name}({parameters_joined}){return_type_out}  {{
+        pub fn {}({parameters_joined}){return_type_out}  {{
             unsafe {{ mujoco_c::{fn_name}({}) }}
         }}
-        ", out_parameters_names.join(", "));
+        ", fn_name.to_snake_case(), out_parameters_names.join(", "));
     }
 }
