@@ -7,7 +7,7 @@ use inflector::Inflector;
 use regex;
 
 
-const RE_FUNCTION_DECL: &str = r"(?s)MJAPI\s+((?:const)?\s*(?:[A-z0-9_*]+))\s+(\w+)\s*\((.+?)\)";
+const RE_FUNCTION_DECL: &str = r"(?s)((?://[^\r\n]*\r?\n)+)\s*MJAPI\s+((?:const)?\s*(?:[A-z0-9_*]+))\s+(\w+)\s*\((.+?)\)";
 
 
 pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
@@ -26,11 +26,13 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
     let mut out_parameters = Vec::new();
     let mut out_parameters_names = Vec::new();
     let mut parameter_name;
+    let mut comment_string;
     'fn_loop: for capture in re.captures_iter(&filedata) {
-        let (return_type, fn_name, param_string) = (
+        let (comment, return_type, fn_name, param_string) = (
             capture.get(1).unwrap().as_str(),
             capture.get(2).unwrap().as_str(),
-            capture.get(3).unwrap().as_str()
+            capture.get(3).unwrap().as_str(),
+            capture.get(4).unwrap().as_str()
         );
 
         if return_type.ends_with("*") || param_string.contains("*") {  // we don't want pointers
@@ -96,10 +98,15 @@ pub fn create_fixed_array_fn_wrappers(mujoco_h_path: &Path) {
             return_type_out = format!(" -> std::ffi::c_{return_type}");
         };
 
+        comment_string = comment.lines().map(|x|
+            x.replace("//", "///").replace("[", r"\[")
+                .replace("]", r"\]")
+            ).collect::<Vec<_>>().join("\n");
+
         println!("
-        pub fn {}({parameters_joined}){return_type_out}  {{
-            unsafe {{ mujoco_c::{fn_name}({}) }}
-        }}
-        ", fn_name.to_snake_case(), out_parameters_names.join(", "));
+{comment_string}
+pub fn {}({parameters_joined}){return_type_out}  {{
+    unsafe {{ mujoco_c::{fn_name}({}) }}
+}}", fn_name.to_snake_case(), out_parameters_names.join(", "));
     }
 }
