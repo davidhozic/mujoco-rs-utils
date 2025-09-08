@@ -81,11 +81,11 @@ fn process_arguments(param_string: &str, self_name: &str) -> Option<(Vec<String>
             }
         }
         else {
-            if parameter_parts[0] == "const" && parameter_parts[1] == self_name  {
+            if parameter_parts[0] == "const" && parameter_parts[1].starts_with(self_name)  {
                 out_parameters_names.push("self.ffi()".into());
                 out_parameters.insert(0, "&self".into());
             }
-            else if parameter_parts[0] == self_name {
+            else if parameter_parts[0].starts_with(self_name) {
                 out_parameters_names.push("self.ffi_mut()".into());
                 out_parameters.insert(0, "&mut self".into());
             }
