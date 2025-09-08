@@ -6,7 +6,7 @@ use regex;
 
 
 
-pub fn create_mj_self_methods(path: &Path, self_name: &str) {
+pub fn create_mj_self_methods(path: &Path, self_name: &str, blacklist: &[String]) {
     let re = regex::Regex::new(&format!(r"(?s)((?://[^\r\n]*?\r?\n)+?)\s*MJAPI\s+((?:const\s+)?[\w*]+)\s+(\w+)\s*\(([^)]*?{self_name}[^)]*?)\)\s*;")).unwrap();
     let fdata = fs::read_to_string(path).unwrap();
 
@@ -35,7 +35,7 @@ pub fn create_mj_self_methods(path: &Path, self_name: &str) {
             ).collect::<Vec<_>>().join("\n");
 
 
-        if let Some((params, param_names)) = process_arguments(param_string, self_name) {
+        if let Some((params, param_names)) = process_arguments(param_string, self_name, blacklist) {
             // println!("{fn_name}({param_string}); Parsed: {params:?} {param_names:?}");            
             println!("
 {comment_string}
@@ -49,7 +49,7 @@ params.join(", "), param_names.join(", "));
 }
 
 
-fn process_arguments(param_string: &str, self_name: &str) -> Option<(Vec<String>, Vec<String>)> {
+fn process_arguments(param_string: &str, self_name: &str, blacklist: &[String]) -> Option<(Vec<String>, Vec<String>)> {
     let mut out_parameters = Vec::new();
     let mut out_parameters_names = Vec::new();
     let mut parameter_parts: Vec<_>;
@@ -57,6 +57,11 @@ fn process_arguments(param_string: &str, self_name: &str) -> Option<(Vec<String>
     let mut param_name;
     let mut param_name_string;
     let mut mutability;
+
+    if blacklist.iter().any(|x| param_string.contains(x)) {
+        return None;
+    }
+
     for parameter in param_string.split(",") {
         parameter_parts = parameter.split_ascii_whitespace().collect();
 

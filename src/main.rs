@@ -36,6 +36,10 @@ enum Command {
         mujoco_h_path: PathBuf,
         /// The struct name to create method wrappers.
         struct_: String,
+        
+        /// Ignore the methods that contain these types in the parameters.
+        #[arg(num_args=0..)]
+        blacklist: Vec<String>
     }
 }
 
@@ -54,8 +58,8 @@ fn main() {
             fixed_arr_fn::create_fixed_array_fn_wrappers(&mujoco_h_path);
         },
 
-        CreateModelMethods { mujoco_h_path , struct_} => {
-            model_fn::create_mj_self_methods(&mujoco_h_path, &struct_);
+        CreateModelMethods { mujoco_h_path , struct_, blacklist} => {
+            model_fn::create_mj_self_methods(&mujoco_h_path, &struct_, &blacklist);
         }
     }
 }
