@@ -19,18 +19,29 @@ pub fn create_mj_self_methods(path: &Path, self_name: &str) {
             capture.get(4).unwrap().as_str(),
         );
 
-        if fn_name != "mjd_inverseFD" {
-            continue;
+        let return_type_out = if return_type == "void" {
+            String::new()
         }
+        else if return_type.starts_with("mj") {
+            format!(" -> {}", return_type.to_pascal_case())
+        }
+        else {
+            format!(" -> std::ffi::c_{return_type}")
+        };
+
+        let comment_string = docstring.lines().map(|x|
+            x.replace("//", "///").replace("[", r"\[")
+                .replace("]", r"\]")
+            ).collect::<Vec<_>>().join("\n");
+
 
         if let Some((params, param_names)) = process_arguments(param_string, self_name) {
             // println!("{fn_name}({param_string}); Parsed: {params:?} {param_names:?}");            
-            println!("\
-{}
-pub fn {}({}) {{
+            println!("
+{comment_string}
+pub fn {}({}){return_type_out} {{
     unsafe {{ {fn_name}({}) }}
 }}",
-docstring.lines().map(|l| l.replace("//", "\n///")).collect::<String>(),
 strip_matches.iter().fold(fn_name, |acc, p| acc.trim_start_matches(p)).to_snake_case(),
 params.join(", "), param_names.join(", "));
         }
