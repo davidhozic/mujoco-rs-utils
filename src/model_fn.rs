@@ -19,14 +19,20 @@ pub fn create_mj_self_methods(path: &Path, self_name: &str) {
             capture.get(4).unwrap().as_str(),
         );
 
+        if fn_name != "mjd_inverseFD" {
+            continue;
+        }
+
         if let Some((params, param_names)) = process_arguments(param_string, self_name) {
             // println!("{fn_name}({param_string}); Parsed: {params:?} {param_names:?}");            
-            println!("
-            pub fn {}({}) {{
-                unsafe {{ {fn_name}({}) }}
-            }}
-            ", strip_matches.iter().fold(fn_name, |acc, p| acc.trim_start_matches(p)).to_snake_case(),
-            params.join(", "), param_names.join(", "));
+            println!("\
+{}
+pub fn {}({}) {{
+    unsafe {{ {fn_name}({}) }}
+}}",
+docstring.lines().map(|l| l.replace("//", "\n///")).collect::<String>(),
+strip_matches.iter().fold(fn_name, |acc, p| acc.trim_start_matches(p)).to_snake_case(),
+params.join(", "), param_names.join(", "));
         }
     }
 }
@@ -38,6 +44,7 @@ fn process_arguments(param_string: &str, self_name: &str) -> Option<(Vec<String>
     let mut parameter_parts: Vec<_>;
     let mut param_type;
     let mut param_name;
+    let mut param_name_string;
     let mut mutability;
     for parameter in param_string.split(",") {
         parameter_parts = parameter.split_ascii_whitespace().collect();
@@ -90,7 +97,8 @@ fn process_arguments(param_string: &str, self_name: &str) -> Option<(Vec<String>
                     (parameter_parts[0], "&mut ")
                 };
 
-                let is_pointer = param_type.ends_with("*");
+                param_name = parameter_parts[parameter_parts.len() - 1];
+                let is_pointer = param_type.ends_with("*") || param_name.starts_with("*");
                 let mut param_type_string = if param_type.starts_with("mj") {
                     param_type.to_pascal_case()
                 }
@@ -102,9 +110,9 @@ fn process_arguments(param_string: &str, self_name: &str) -> Option<(Vec<String>
                     param_type_string = mutability.to_string() + &param_type_string;
                 }
 
-                param_name = parameter_parts[parameter_parts.len() - 1].to_snake_case();
-                out_parameters.push(format!("{}: {}", param_name, param_type_string));
-                out_parameters_names.push(param_name);
+                param_name_string = param_name.to_snake_case();  // also removes the pointer *
+                out_parameters.push(format!("{}: {}", param_name_string, param_type_string));
+                out_parameters_names.push(param_name_string);
             }
         }
     }
