@@ -30,9 +30,12 @@ enum Command {
     },
 
     /// Creates method wrappers for functions that potentially and logically
-    /// belong to MjModel.
+    /// belong to some MjX struct.
     CreateModelMethods {
-        mujoco_h_path: PathBuf
+        /// Path to the mujoco.h file.
+        mujoco_h_path: PathBuf,
+        /// The struct name to create method wrappers.
+        struct_: String,
     }
 }
 
@@ -51,8 +54,8 @@ fn main() {
             fixed_arr_fn::create_fixed_array_fn_wrappers(&mujoco_h_path);
         },
 
-        CreateModelMethods { mujoco_h_path } => {
-            model_fn::create_model_methods(&mujoco_h_path);
+        CreateModelMethods { mujoco_h_path , struct_} => {
+            model_fn::create_mj_self_methods(&mujoco_h_path, &struct_);
         }
     }
 }

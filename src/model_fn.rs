@@ -1,42 +1,38 @@
-//! Module for creating MjModel methods
+//! Module for creating Mjx methods
 use inflector::Inflector;
 use std::path::Path;
 use std::fs;
 use regex;
 
 
-const RE_SIGNATURE: &str = r"MJAPI\s+((?:const\s+)?[\w*]+)\s+(\w+)\s*\((.*mjModel.*)\)";
 
-
-pub fn create_model_methods(path: &Path) {
-    let re = regex::Regex::new(RE_SIGNATURE).unwrap();
+pub fn create_mj_self_methods(path: &Path, self_name: &str) {
+    let re = regex::Regex::new(&format!(r"(?s)((?://[^\r\n]*?\r?\n)+?)\s*MJAPI\s+((?:const\s+)?[\w*]+)\s+(\w+)\s*\(([^)]*?{self_name}[^)]*?)\)\s*;")).unwrap();
     let fdata = fs::read_to_string(path).unwrap();
 
+    let strip_matches: &[_] = &["mj_", "mjv_", "mjr_", "mjd_", "mju_"];
     for capture in re.captures_iter(&fdata) {
-        let (return_type, fn_name, param_string) = (
+        let (docstring, return_type, fn_name, param_string) = (
             capture.get(1).unwrap().as_str(),
             capture.get(2).unwrap().as_str(),
             capture.get(3).unwrap().as_str(),
+            capture.get(4).unwrap().as_str(),
         );
-        
-        if param_string.contains("mjData") {
-            continue;
-        }
 
-        if let Some((params, param_names)) = process_arguments(param_string) {
-            // println!("{fn_name}({param_string}); Parsed: {params:?} {param_names:?}");
+        if let Some((params, param_names)) = process_arguments(param_string, self_name) {
+            // println!("{fn_name}({param_string}); Parsed: {params:?} {param_names:?}");            
             println!("
             pub fn {}({}) {{
                 unsafe {{ {fn_name}({}) }}
             }}
-            ", fn_name.trim_start_matches("mj_").to_snake_case(),
+            ", strip_matches.iter().fold(fn_name, |acc, p| acc.trim_start_matches(p)).to_snake_case(),
             params.join(", "), param_names.join(", "));
         }
     }
 }
 
 
-fn process_arguments(param_string: &str) -> Option<(Vec<String>, Vec<String>)> {
+fn process_arguments(param_string: &str, self_name: &str) -> Option<(Vec<String>, Vec<String>)> {
     let mut out_parameters = Vec::new();
     let mut out_parameters_names = Vec::new();
     let mut parameter_parts: Vec<_>;
@@ -78,11 +74,11 @@ fn process_arguments(param_string: &str) -> Option<(Vec<String>, Vec<String>)> {
             }
         }
         else {
-            if parameter_parts[0] == "const" && parameter_parts[1] == "mjModel*"  {
+            if parameter_parts[0] == "const" && parameter_parts[1] == self_name  {
                 out_parameters_names.push("self.ffi()".into());
                 out_parameters.insert(0, "&self".into());
             }
-            else if parameter_parts[0] == "mjModel*" {
+            else if parameter_parts[0] == self_name {
                 out_parameters_names.push("self.ffi_mut()".into());
                 out_parameters.insert(0, "&mut self".into());
             }
