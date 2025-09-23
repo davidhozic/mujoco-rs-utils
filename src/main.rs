@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 mod fixed_arr_fn;
 mod model_fn;
+mod typedef;
 mod views;
 
 
@@ -40,6 +41,13 @@ enum Command {
         /// Ignore the methods that contain these types in the parameters.
         #[arg(num_args=0..)]
         blacklist: Vec<String>
+    },
+    /// Create type redefinitions for types that start with a given string.
+    CreateTypes {
+        /// Path to the documentation APtypes.rst file
+        api_reference: PathBuf,
+        /// The prefix that the type needs to have.
+        prefix: Option<String>,
     }
 }
 
@@ -60,6 +68,9 @@ fn main() {
 
         CreateModelMethods { mujoco_h_path , struct_, blacklist} => {
             model_fn::create_mj_self_methods(&mujoco_h_path, &struct_, &blacklist);
+        }
+        CreateTypes { api_reference, prefix } => {
+            typedef::create_types(&api_reference, prefix.as_deref());
         }
     }
 }
