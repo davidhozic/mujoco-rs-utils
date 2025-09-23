@@ -15,6 +15,6 @@ pub fn create_types(api_reference: &Path, prefix: Option<&str>) {
         for line in docstring.lines() {
             println!("/// {line}");
         }
-        println!("type {} = {};\n", name.to_pascal_case(), name);
+        println!("pub type {} = {};\n", name.to_pascal_case(), name);
     }
 }
