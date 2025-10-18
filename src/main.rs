@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod fixed_arr_fn;
+mod array_slice;
 mod model_fn;
 mod typedef;
 mod views;
@@ -48,6 +49,16 @@ enum Command {
         api_reference: PathBuf,
         /// The prefix that the type needs to have.
         prefix: Option<String>,
+    },
+    /// Creates a `array_slice_dyn` macro call
+    /// for generating a slice into the array.
+    CreateArraySliceMacroCall {
+        /// Path to the documentation structs.h file containing the documentation-public structs.
+        structs_filepath: PathBuf,
+        /// The prefix to add in front of the parsed length variable.
+        accessor_prefix: String,
+        /// The name of the struct for which to create the slice methods.
+        struct_name: String
     }
 }
 
@@ -69,8 +80,13 @@ fn main() {
         CreateModelMethods { mujoco_h_path , struct_, blacklist} => {
             model_fn::create_mj_self_methods(&mujoco_h_path, &struct_, &blacklist);
         }
+
         CreateTypes { api_reference, prefix } => {
             typedef::create_types(&api_reference, prefix.as_deref());
+        }
+
+        CreateArraySliceMacroCall { structs_filepath, accessor_prefix, struct_name } => {
+            array_slice::create_array_slice(&structs_filepath, &accessor_prefix, &struct_name);
         }
     }
 }
