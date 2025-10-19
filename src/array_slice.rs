@@ -20,7 +20,7 @@ const C_TO_RUST_TYPE_MAPPING: LazyCell<HashMap<&'static str, &'static str>> = La
 const ENUM_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r"(.*?)\((mjt[A-z]+)\)").unwrap());
 
 
-fn display_parsed(datatype: &str, name: &str, comment: &str, size_var: &str, size_mul: &str, accessor_prefix: &str) {
+fn display_parsed(datatype: &str, name: &str, comment: &str, size_var: &str, size_mul: &str, accessor_prefix: &str, summed_type: bool) {
     // Convert to pascal case whenever the type starts with 'mj' or try to map to a Rust type.
     // If conversion fails, use the C FFI type.
     let datatype = if datatype.starts_with("mj") {datatype.to_pascal_case()} else {
@@ -29,16 +29,23 @@ fn display_parsed(datatype: &str, name: &str, comment: &str, size_var: &str, siz
         } else { format!("std::ffi::c_{datatype}") }
     };
 
+    // A special case where the length of an array is a sum of values in some other array
+    if summed_type {
+        println!("{name}: &[{datatype}; \"{comment}\"; [{size_mul}; ({accessor_prefix}.{size_var}); ({accessor_prefix}.)]],");
+    }
+
     // Create an array type if size is larger than one, otherwise assume scalar
-    if size_mul == "1" || size_mul.len() == 0 {
+    else if size_mul == "1" || size_mul.len() == 0 {
         println!(
-            "{name}: &[{datatype}{}; \"{}\"; {accessor_prefix}.{size_var}],",
-            if datatype.starts_with("Mjt") && datatype != "MjtNum" && datatype != "MjtByte" {" [cast]"} else {""},
-            comment.trim()
+            "{name}: &[{datatype}{}; \"{comment}\"; {accessor_prefix}.{size_var}],",
+            if datatype.starts_with("Mjt") && datatype != "MjtNum" && datatype != "MjtByte" {" [cast]"} else {""}
         );
     }
     else {
-        println!("{name}: &[[{datatype}; {size_mul} as usize] [cast]; \"{}\"; {accessor_prefix}.{size_var}],", comment.trim());
+        let type_cast = if size_mul.chars().all(char::is_numeric) {
+            ""
+        } else {" as usize"};
+        println!("{name}: &[[{datatype}; {size_mul}{type_cast}] [cast]; \"{comment}\"; {accessor_prefix}.{size_var}],");
     }
 }
 
@@ -61,12 +68,16 @@ pub fn create_array_slice(structs_filepath: &Path, accessor_prefix: &str, struct
     let re = regex::Regex::new(&format!(r"(?s)struct\s+{struct_name}\s*\{{.*?\n}};")).unwrap();
     let struct_data = re.find(&filedata).expect("failed to find struct or struct body").as_str();
 
+    println!("------------------------------------------------");
+    println!("Processing lengths obtained via single attribute");
+    println!("------------------------------------------------");
+
     // Match the sizes that are marked with n something x some number
     let re = regex::Regex::new(r"(?m)((?:unsigned\s+)?[^\s]+)(?:\*\s+([^\s]+)|\s+([^\s]+)\[.+\]);\s+//(.*)\(([A-z]+)\s*(?:x|\*)\s*(\w+)\)$").unwrap();
     for capture in re.captures_iter(struct_data) {
         let (_, [mut datatype, name, mut comment, size_var, size_mul]) = capture.extract();
         (comment, datatype) = extract_possible_enum(comment, datatype);
-        display_parsed(datatype, name, comment, size_var, size_mul, accessor_prefix);
+        display_parsed(datatype, name, comment.trim(), size_var, size_mul, accessor_prefix, false);
     }
 
     // Match the sizes that are marked with some number * n something
@@ -74,14 +85,26 @@ pub fn create_array_slice(structs_filepath: &Path, accessor_prefix: &str, struct
     for capture in re.captures_iter(struct_data) {
         let (_, [mut datatype, name, mut comment, size_mul, size_var]) = capture.extract();
         (comment, datatype) = extract_possible_enum(comment, datatype);
-        display_parsed(datatype, name, comment, size_var, size_mul, accessor_prefix);
+        display_parsed(datatype, name, comment.trim(), size_var, size_mul, accessor_prefix, false);
     }
 
     // Match the sizes that are marked with some fixed attribute for length
-    let re = regex::Regex::new(r"(?m)((?:unsigned\s+)?[^\s]+)(?:\*\s+([^\s]+));\s+//(.*)\((\w+)\)$").unwrap();
+    let re = regex::Regex::new(r"(?m)((?:unsigned\s+)?[^\s]+)(?:\*\s+([^\s]+)|\s+([^\s]+)\[\w*\]);\s+//(.*)\((\w+)\)$").unwrap();
     for capture in re.captures_iter(struct_data) {
         let (_, [mut datatype, name, mut comment, size_var]) = capture.extract();
         (comment, datatype) = extract_possible_enum(comment, datatype);
-        display_parsed(datatype, name, comment, size_var, "", accessor_prefix);
+        display_parsed(datatype, name, comment.trim(), size_var, "", accessor_prefix, false);
+    }
+
+    println!("--------------------------------------------------------");
+    println!("Processing lengths obtained via sum of some length array");
+    println!("--------------------------------------------------------");
+
+    // Match summed length array
+    let re = regex::Regex::new(r"(?m)((?:unsigned\s+)?[^\s]+)(?:\*\s+([^\s]+));\s+//(.*)\(\s*([0-9])+\s*[*x]\s*sum\((\w+)\)\s*\)$").unwrap();
+    for capture in re.captures_iter(struct_data) {
+        let (_, [mut datatype, name, mut comment, size_mul, size_var]) = capture.extract();
+        (comment, datatype) = extract_possible_enum(comment, datatype);
+        display_parsed(datatype, name, comment.trim(), size_var, size_mul, accessor_prefix, true);
     }
 }
