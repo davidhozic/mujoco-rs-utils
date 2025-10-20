@@ -3,6 +3,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod getter_setter;
 mod fixed_arr_fn;
 mod array_slice;
 mod model_fn;
@@ -59,10 +60,16 @@ enum Command {
         accessor_prefix: String,
         /// The name of the struct for which to create the slice methods.
         struct_name: String
+    },
+
+    /// Creates getter setters macro calls for reading and writing to non-array data.
+    CreateGettersSetters {
+        /// Path to the documentation structs.h file containing the documentation-public structs.
+        structs_filepath: PathBuf,
+        /// The name of the struct for which to create the slice methods.
+        struct_name: String
     }
 }
-
-
 
 
 fn main() {
@@ -87,6 +94,10 @@ fn main() {
 
         CreateArraySliceMacroCall { structs_filepath, accessor_prefix, struct_name } => {
             array_slice::create_array_slice(&structs_filepath, &accessor_prefix, &struct_name);
+        }
+
+        CreateGettersSetters { structs_filepath, struct_name } => {
+            getter_setter::create_getters_setters(&structs_filepath, &struct_name);
         }
     }
 }
