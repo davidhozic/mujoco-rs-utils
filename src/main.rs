@@ -1,6 +1,6 @@
 //! # MuJoCo-rs-util
 //! A CLI utility to support some development of MuJoCo-rs.
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 mod getter_setter;
@@ -8,8 +8,8 @@ mod fixed_arr_fn;
 mod array_slice;
 mod model_fn;
 mod typedef;
+mod verify;
 mod views;
-
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -68,7 +68,19 @@ enum Command {
         structs_filepath: PathBuf,
         /// The name of the struct for which to create the slice methods.
         struct_name: String
+    },
+
+    /// Verifies selected items are correctly defined in MuJoCo-rs.
+    Verify {
+        #[arg(required=true)]
+        items: Vec<ItemType>
     }
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+enum ItemType {
+    /// Verifies infos and views are correctly implemented.
+    InfoViews,
 }
 
 
@@ -98,6 +110,10 @@ fn main() {
 
         CreateGettersSetters { structs_filepath, struct_name } => {
             getter_setter::create_getters_setters(&structs_filepath, &struct_name);
+        }
+
+        Verify { items } => {
+            todo!()
         }
     }
 }
