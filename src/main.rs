@@ -5,10 +5,10 @@ use std::path::PathBuf;
 
 mod getter_setter;
 mod fixed_arr_fn;
+mod info_method;
 mod array_slice;
 mod model_fn;
 mod typedef;
-mod views;
 
 
 #[derive(Parser, Debug)]
@@ -23,9 +23,10 @@ struct Args {
 enum Command {
     /// A helper to automatically create calls to macros to facilitate the
     /// the view to MjData/MjModel array.
-    CreateViews {
+    CreateInfoCalls {
         indexer_xmacro_path: PathBuf
     },
+
     /// Creates Rust wrappers around C MuJoCo functions that have
     /// fixed-sized arrays as parameters.
     CreateFixedArrayFunctionWrappers {
@@ -76,8 +77,8 @@ fn main() {
     let parser = Args::parse(); 
     use Command::*;
     match parser.command {
-        CreateViews { indexer_xmacro_path } => {
-            views::create_views(&indexer_xmacro_path);
+        CreateInfoCalls { indexer_xmacro_path } => {
+            info_method::create_info_calls(&indexer_xmacro_path);
         },
 
         CreateFixedArrayFunctionWrappers { mujoco_h_path } => {
