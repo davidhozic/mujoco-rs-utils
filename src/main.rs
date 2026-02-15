@@ -5,10 +5,10 @@ use std::path::PathBuf;
 
 mod getter_setter;
 mod fixed_arr_fn;
+mod info_method;
 mod array_slice;
 mod model_fn;
 mod typedef;
-mod views;
 
 
 #[derive(Parser, Debug)]
@@ -26,6 +26,7 @@ enum Command {
     CreateViews {
         indexer_xmacro_path: PathBuf
     },
+
     /// Creates Rust wrappers around C MuJoCo functions that have
     /// fixed-sized arrays as parameters.
     CreateFixedArrayFunctionWrappers {
@@ -77,7 +78,7 @@ fn main() {
     use Command::*;
     match parser.command {
         CreateViews { indexer_xmacro_path } => {
-            views::create_views(&indexer_xmacro_path);
+            info_method::create_views(&indexer_xmacro_path);
         },
 
         CreateFixedArrayFunctionWrappers { mujoco_h_path } => {
