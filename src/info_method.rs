@@ -12,7 +12,7 @@ const RE_DEFINE_PATTERN: &str = r"#define MJ(?<class>[A-z]+)_(?<item>[A-z]+).*?\
 /// We assume that nx means length of an array, whose elements are not of fixed-length.
 const NX_ALLOWED_DIRECT_LENGTH: [&str; 1] = ["nu"];
 
-pub fn create_info_calls(filepath: &Path) {
+pub fn create_views(filepath: &Path) {
     /* Read the contents of the file containing the view defines (indexer_xmacro.h) */
     let filedata = fs::read_to_string(filepath).expect("could not read the file");
 

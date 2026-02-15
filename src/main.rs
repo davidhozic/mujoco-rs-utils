@@ -23,7 +23,7 @@ struct Args {
 enum Command {
     /// A helper to automatically create calls to macros to facilitate the
     /// the view to MjData/MjModel array.
-    CreateInfoCalls {
+    CreateViews {
         indexer_xmacro_path: PathBuf
     },
 
@@ -77,8 +77,8 @@ fn main() {
     let parser = Args::parse(); 
     use Command::*;
     match parser.command {
-        CreateInfoCalls { indexer_xmacro_path } => {
-            info_method::create_info_calls(&indexer_xmacro_path);
+        CreateViews { indexer_xmacro_path } => {
+            info_method::create_views(&indexer_xmacro_path);
         },
 
         CreateFixedArrayFunctionWrappers { mujoco_h_path } => {
