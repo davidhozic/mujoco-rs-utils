@@ -23,6 +23,8 @@ pub fn create_info_calls(filepath: &Path) {
         .multi_line(true)
         .build().expect("invalid regex");
 
+    let mut info_method_calls = vec![];
+    let mut info_with_view_calls = vec![];
     for capture in re.captures_iter(&filedata) {
         let (class, item, capture_data) = (
             capture.name("class").expect("could not find the class type").as_str().to_lowercase(),
@@ -35,46 +37,94 @@ pub fn create_info_calls(filepath: &Path) {
         //     objtype: 1, objid: 1, reftype: 1, refid: 1, intprm: mjNSENS as usize,
         //     dim: 1, adr: 1, cutoff: 1, noise: 1
         // ], [], []}
-        let mut fixed_length_attributes = vec![];
-        let mut external_length_attributes = vec![];
-        let mut dynamic_length_attributes = vec![];
+        let mut fixed_length_attributes_lengths = vec![];
+        let mut external_length_attributes_lengths = vec![];
+        let mut dynamic_length_attributes_lengths = vec![];
+
+        // info_with_view!(Data, actuator, [ctrl: MjtNum], [act: MjtNum], M: Deref<Target = MjModel>);
+        let mut attribute_types_and_names = vec![];
+        let mut attribute_accessor_prefix = None;
+
         /* Parse individual X(..) */
         for line in capture_data.lines().skip(1) {  // skip the #define line
             // Remove parentheses, trim whitespace and parse into parts.
             let mut parts: Vec<_> = line.split(",").map(|item| item.trim()).collect();
-            *parts.first_mut().unwrap() = parts.first().unwrap().split_once("(").unwrap().1;
+            *parts.first_mut().unwrap() = parts.first().unwrap().split_once("(").unwrap().1.trim();
 
             // Split at last ). Multiple ) can appear due to MJ_M(...).
             *parts.last_mut().unwrap() = parts.last().unwrap().rsplit_once(")").unwrap().0.trim();
 
-            if let [_, _, suffix, ntotaldim, dim] = &mut parts[..] {
+            if let [type_, prefix, attribute, ntotaldim, dim] = &parts[..] {
+                let type_ = match *type_ {
+                    "float" => "f32".to_string(),
+                    "double" => "f64".to_string(),
+                    "int" => "i32".to_string(),
+                    _ if type_.starts_with("mjt") => type_.to_pascal_case(),
+                    _ => type_.to_string()
+                };
+
+                let prefix = prefix.trim();
+                if !prefix.is_empty() {
+                    if let Some(prefix_old) = attribute_accessor_prefix && prefix_old != prefix {
+                        // Maybe TODO: perhaps make infos and views have an accessor prefix specified at attribute.
+                        eprintln!("warning! prefixes differ between attributes ({class}, {item}, {attribute} --- {prefix} != {prefix_old})");
+                    } else {
+                        attribute_accessor_prefix = Some(prefix);
+                    }
+                }
+
+                attribute_types_and_names.push(format!("{attribute}: {type_}"));
+
                 // Match the number of dimensions string to correct mapping address array in MjModel
                 if dim.starts_with("MJ_M(") {
                     let (left, mut right) = dim.strip_prefix("MJ_M(").unwrap().split_once(")").unwrap();
-                    *dim = left;
                     right = right.trim();
-                    external_length_attributes.push(format!("{suffix}: {left}{right}"));
+                    external_length_attributes_lengths.push(format!("{attribute}: {left}{right}"));
                 }
                 else if ntotaldim.len() > 2 || NX_ALLOWED_DIRECT_LENGTH.contains(ntotaldim) {
-                    fixed_length_attributes.push(format!("{suffix}: {dim}"));
+                    fixed_length_attributes_lengths.push(format!("{attribute}: {dim}"));
                 }
                 else {
-                    dynamic_length_attributes.push(format!("{suffix}: {ntotaldim}"));
+                    dynamic_length_attributes_lengths.push(format!("{attribute}: {ntotaldim}"));
                 }
             }
         }
 
-        if fixed_length_attributes.len() + dynamic_length_attributes.len() + external_length_attributes.len() > 0 {
-            println!(
-                "info_method! {{ {}, ffi(), {},\
+        if fixed_length_attributes_lengths.len() + dynamic_length_attributes_lengths.len() + external_length_attributes_lengths.len() > 0 {
+            let class = class.to_pascal_case();
+            let item = item.to_lowercase();
+            info_method_calls.push(format!(
+                "info_method! {{ {class}, ffi(), {item},\
                     \n\t       [{}],\
                     \n\t       [{}],\
-                    \n\t       [{}] }}\n",
-                class.to_pascal_case(), item.to_lowercase(),
-                fixed_length_attributes.join(", "),
-                external_length_attributes.join(", "),
-                dynamic_length_attributes.join(", "),
-            );
+                    \n\t       [{}] }}",
+                fixed_length_attributes_lengths.join(", "),
+                external_length_attributes_lengths.join(", "),
+                dynamic_length_attributes_lengths.join(", "),
+            ));
+
+            // Generate info and view structs. Here we assume all attributes are mandatory
+            // as there is no way to check this here (MANUAL CHECK REQUIRED!).
+            info_with_view_calls.push(format!(
+                "info_with_view!({class}, {item}{}, [{}], [/* CHECK REQUIRED */]{});",
+                if let Some(prefix) = attribute_accessor_prefix { format!(", {prefix}") } else { "".to_string() },
+                attribute_types_and_names.join(", "),
+                if class == "Data" {
+                    ", M: Deref<Target = MjModel>"  // MjData has this trait bound.
+                } else { "" }  // MjModel and others have no trait bound.
+            ));
         }
+    }
+
+    println!("------------------------------------------------");
+    println!("Info methods:");
+    for info_method_call in &info_method_calls {
+        println!("{info_method_call}\n");
+    }
+
+    println!("------------------------------------------------");
+    println!("Info with view definitions:");
+    for info_with_view_call in &info_with_view_calls {
+        println!("{info_with_view_call}\n");
     }
 }
