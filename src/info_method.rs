@@ -111,19 +111,20 @@ pub fn create_views(filepath: &Path) {
             let item = item.to_lowercase();
             info_method_calls.push(format!(
                 "info_method! {{ {class}, ffi(), {item},\
-                    \n\t       [{}],\
-                    \n\t       [{}],\
-                    \n\t       [{}] }}",
-                fixed_length_attributes_lengths.join(", "),
-                external_length_attributes_lengths.join(", "),
-                dynamic_length_attributes_lengths.join(", "),
+                    \n\t[{}],\
+                    \n\t[{}],\
+                    \n\t[{}]\
+                    \n}}",
+                join_attributes_chunked_pretty(&fixed_length_attributes_lengths, 3),
+                join_attributes_chunked_pretty(&external_length_attributes_lengths, 3),
+                join_attributes_chunked_pretty(&dynamic_length_attributes_lengths, 3),
             ));
 
             // Generate info and view structs. Here we assume all attributes are mandatory
             // as there is no way to check this here (MANUAL CHECK REQUIRED!).
             info_with_view_calls.push(format!(
-                "info_with_view!({class}, {item}, [{}], [/* CHECK REQUIRED */]{});",
-                attribute_types_and_names.join(", "),
+                "info_with_view!({class}, {item},\n\t[{}],\n\t[]{});",
+                join_attributes_chunked_pretty(&attribute_types_and_names, 10),
                 if class == "Data" {
                     ", M: Deref<Target = MjModel>"  // MjData has this trait bound.
                 } else { "" }  // MjModel and others have no trait bound.
@@ -138,4 +139,13 @@ pub fn create_views(filepath: &Path) {
     for info_with_view_call in &info_with_view_calls {
         println!("{info_with_view_call}\n");
     }
+}
+
+/// Joins chunks of text elements together in such way that it ends up
+/// prettified. The `n_lines_target` specifies the approximate number of lines
+/// to have in the end.
+fn join_attributes_chunked_pretty(data: &[String], n_lines_target: usize) -> String {
+    data.chunks((data.len() / n_lines_target).max(1)).map(|chunk| chunk.join(", "))
+        .collect::<Vec<_>>()
+        .join(",\n\t ")
 }
