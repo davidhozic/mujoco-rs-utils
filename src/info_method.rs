@@ -111,9 +111,9 @@ pub fn create_views(filepath: &Path) {
             let item = item.to_lowercase();
             info_method_calls.push(format!(
                 "info_method! {{ {class}, ffi(), {item},\
-                    \n\t[{}],\
-                    \n\t[{}],\
-                    \n\t[{}]\
+                    \n    [{}],\
+                    \n    [{}],\
+                    \n    [{}]\
                     \n}}",
                 join_attributes_chunked_pretty(&fixed_length_attributes_lengths, 3),
                 join_attributes_chunked_pretty(&external_length_attributes_lengths, 3),
@@ -123,7 +123,7 @@ pub fn create_views(filepath: &Path) {
             // Generate info and view structs. Here we assume all attributes are mandatory
             // as there is no way to check this here (MANUAL CHECK REQUIRED!).
             info_with_view_calls.push(format!(
-                "info_with_view!({class}, {item},\n\t[{}],\n\t[]{});",
+                "info_with_view!({class}, {item},\n    [{}],\n    []{});",
                 join_attributes_chunked_pretty(&attribute_types_and_names, 10),
                 if class == "Data" {
                     ", M: Deref<Target = MjModel>"  // MjData has this trait bound.
@@ -147,5 +147,5 @@ pub fn create_views(filepath: &Path) {
 fn join_attributes_chunked_pretty(data: &[String], n_lines_target: usize) -> String {
     data.chunks((data.len() / n_lines_target).max(1)).map(|chunk| chunk.join(", "))
         .collect::<Vec<_>>()
-        .join(",\n\t ")
+        .join(",\n     ")
 }
