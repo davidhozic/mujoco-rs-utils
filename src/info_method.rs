@@ -43,7 +43,6 @@ pub fn create_views(filepath: &Path) {
 
         // info_with_view!(Data, actuator, [ctrl: MjtNum], [act: MjtNum], M: Deref<Target = MjModel>);
         let mut attribute_types_and_names = vec![];
-        let mut attribute_accessor_prefix = None;
 
         /* Parse individual X(..) */
         for line in capture_data.lines().skip(1) {  // skip the #define line
@@ -60,32 +59,49 @@ pub fn create_views(filepath: &Path) {
                     "double" => "f64".to_string(),
                     "int" => "i32".to_string(),
                     _ if type_.starts_with("mjt") => type_.to_pascal_case(),
-                    _ => type_.to_string()
+                    _ => type_.to_string(),
                 };
 
-                let prefix = prefix.trim();
-                if !prefix.is_empty() {
-                    if let Some(prefix_old) = attribute_accessor_prefix && prefix_old != prefix {
-                        // Maybe TODO: perhaps make infos and views have an accessor prefix specified at attribute.
-                        eprintln!("warning! prefixes differ between attributes ({class}, {item}, {attribute} --- {prefix} != {prefix_old})");
-                    } else {
-                        attribute_accessor_prefix = Some(prefix);
-                    }
-                }
+                // Some attributes may have _ added in front of them instead of at the prefix.
+                // This ensures our view attributes don't add _ to the attribute name but instead add the _
+                // to the prefix end.
+                let (extra_prefix, attribute) = if attribute.starts_with("_") {
+                    ("_", attribute.strip_prefix("_").unwrap())
+                } else { ("", *attribute) };
 
-                attribute_types_and_names.push(format!("{attribute}: {type_}"));
+                let prefix = prefix.trim();
+                let prefix_str = if !prefix.is_empty() {
+                    format!("[{prefix}{extra_prefix}] ")
+                } else {
+                    "".to_string()
+                };
+
+                let cast_str = if type_.starts_with("Mjt") &&
+                    type_ != "MjtByte" &&
+                    type_ != "MjtSize" &&
+                    type_ != "MjtNum"
+                {
+                    " [cast]"
+                } else {
+                    ""
+                };
+
+                // Exceptions: reserved keywords cannot be attribute names
+                let attribute_extra =  if attribute == "type" {
+                     "r#"
+                } else { "" };
+
+                attribute_types_and_names.push(format!("{prefix_str}{attribute_extra}{attribute}: {type_}{cast_str}"));
 
                 // Match the number of dimensions string to correct mapping address array in MjModel
                 if dim.starts_with("MJ_M(") {
                     let (left, mut right) = dim.strip_prefix("MJ_M(").unwrap().split_once(")").unwrap();
                     right = right.trim();
-                    external_length_attributes_lengths.push(format!("{attribute}: {left}{right}"));
-                }
-                else if ntotaldim.len() > 2 || NX_ALLOWED_DIRECT_LENGTH.contains(ntotaldim) {
-                    fixed_length_attributes_lengths.push(format!("{attribute}: {dim}"));
-                }
-                else {
-                    dynamic_length_attributes_lengths.push(format!("{attribute}: {ntotaldim}"));
+                    external_length_attributes_lengths.push(format!("{attribute_extra}{attribute}: {left}{right}"));
+                } else if ntotaldim.len() > 2 || NX_ALLOWED_DIRECT_LENGTH.contains(ntotaldim) {
+                    fixed_length_attributes_lengths.push(format!("{attribute_extra}{attribute}: {dim}"));
+                } else {
+                    dynamic_length_attributes_lengths.push(format!("{attribute_extra}{attribute}: {ntotaldim}"));
                 }
             }
         }
@@ -106,8 +122,7 @@ pub fn create_views(filepath: &Path) {
             // Generate info and view structs. Here we assume all attributes are mandatory
             // as there is no way to check this here (MANUAL CHECK REQUIRED!).
             info_with_view_calls.push(format!(
-                "info_with_view!({class}, {item}{}, [{}], [/* CHECK REQUIRED */]{});",
-                if let Some(prefix) = attribute_accessor_prefix { format!(", {prefix}") } else { "".to_string() },
+                "info_with_view!({class}, {item}, [{}], [/* CHECK REQUIRED */]{});",
                 attribute_types_and_names.join(", "),
                 if class == "Data" {
                     ", M: Deref<Target = MjModel>"  // MjData has this trait bound.
@@ -116,14 +131,10 @@ pub fn create_views(filepath: &Path) {
         }
     }
 
-    println!("------------------------------------------------");
-    println!("Info methods:");
     for info_method_call in &info_method_calls {
         println!("{info_method_call}\n");
     }
 
-    println!("------------------------------------------------");
-    println!("Info with view definitions:");
     for info_with_view_call in &info_with_view_calls {
         println!("{info_with_view_call}\n");
     }
